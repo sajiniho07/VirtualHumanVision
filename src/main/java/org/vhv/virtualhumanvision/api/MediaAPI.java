@@ -22,7 +22,6 @@ public class MediaAPI {
 
     @GetMapping("/")
     public ResponseEntity<List<Media>> getMedias() {
-
         return ResponseEntity.ok(mediaService.getMedias());
     }
 
