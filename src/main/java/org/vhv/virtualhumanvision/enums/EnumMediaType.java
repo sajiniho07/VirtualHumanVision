@@ -1,0 +1,30 @@
+package org.vhv.virtualhumanvision.enums;
+
+public enum EnumMediaType {
+    VIDEO(1, "video"),
+    STREAM(2, "stream");
+
+    private long id;
+    private String name;
+
+    EnumMediaType(long id, String name) {
+        this.id = id;
+        this.name = name;
+    }
+
+    public long getId() {
+        return id;
+    }
+
+    public void setId(long id) {
+        this.id = id;
+    }
+
+    public String getName() {
+        return name;
+    }
+
+    public void setName(String name) {
+        this.name = name;
+    }
+}
