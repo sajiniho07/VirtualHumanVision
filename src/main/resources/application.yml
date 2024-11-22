@@ -13,3 +13,6 @@ spring:
     multipart:
       max-file-size: 100MB
       max-request-size: 100MB
+media:
+  url: http://localhost/media/
+  upload-base-dir: D:\final project dba\server\res

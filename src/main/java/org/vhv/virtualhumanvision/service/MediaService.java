@@ -29,17 +29,34 @@ public class MediaService {
     }
 
     @Transactional
-    public void save(File destinationFile) {
+    public Long save(File destinationFile) {
         Media media = new Media();
         media.setName(destinationFile.getName());
         MediaType mediaType = new MediaType();
-        mediaType.setId(EnumMediaType.VIDEO.getId());
-        mediaType.setName(EnumMediaType.VIDEO.getName());
+        long mediaTypeId = EnumMediaType.VIDEO.getId();
+        String mediaTypeName = EnumMediaType.VIDEO.getName();
+        if (isImageFile(destinationFile)) {
+            mediaTypeId = EnumMediaType.IMAGE.getId();
+            mediaTypeName = EnumMediaType.IMAGE.getName();
+        }
+        mediaType.setId(mediaTypeId);
+        mediaType.setName(mediaTypeName);
         media.setMediaType(mediaType);
         media.setPath(destinationFile.getPath());
         ZonedDateTime currentDateTime = ZonedDateTime.now();
         media.setCreatedAt(currentDateTime);
-        mediaRepository.save(media);
+        return mediaRepository.save(media).getId();
+    }
+
+    private boolean isImageFile(File file) {
+        String[] imageExtensions = {"jpg", "jpeg", "png", "gif", "bmp"};
+        String fileName = file.getName().toLowerCase();
+        for (String extension : imageExtensions) {
+            if (fileName.endsWith(extension)) {
+                return true;
+            }
+        }
+        return false;
     }
 
     @Transactional

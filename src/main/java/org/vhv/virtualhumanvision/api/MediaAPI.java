@@ -5,6 +5,8 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.web.multipart.MultipartFile;
+import org.vhv.virtualhumanvision.configuration.MediaConfig;
+import org.vhv.virtualhumanvision.dto.GeneralResult;
 import org.vhv.virtualhumanvision.entity.Media;
 import org.vhv.virtualhumanvision.service.MediaService;
 
@@ -18,7 +20,7 @@ import java.util.List;
 public class MediaAPI {
 
     private final MediaService mediaService;
-    private final String UPLOAD_DIR = "D:\\final project dba\\server\\res";
+    private final MediaConfig mediaConfig;
 
     @GetMapping("/")
     public ResponseEntity<List<Media>> getMedias() {
@@ -26,27 +28,29 @@ public class MediaAPI {
     }
 
     @PostMapping("/upload")
-    public ResponseEntity<String> uploadVideo(@RequestParam("file") MultipartFile file) {
+    public ResponseEntity<GeneralResult> upload(@RequestParam("file") MultipartFile file) {
         if (file.isEmpty()) {
-            return ResponseEntity.badRequest().body("Please select a file to upload.");
+            return ResponseEntity.badRequest().body(new GeneralResult(-1L, "", "Please select a file to upload."));
         }
 
         try {
-            File destinationFile = new File(UPLOAD_DIR + File.separator + file.getOriginalFilename());
+            File destinationFile = new File(mediaConfig.getUploadBaseDir() + File.separator + file.getOriginalFilename());
             file.transferTo(destinationFile);
-            mediaService.save(destinationFile);
-            return ResponseEntity.ok("File uploaded successfully: " + destinationFile.getAbsolutePath());
+            Long mediaId = mediaService.save(destinationFile);
+            String path = mediaConfig.getMediaUrl() + destinationFile.getName();
+            GeneralResult result = new GeneralResult(mediaId, path, "File uploaded successfully.");
+            return ResponseEntity.ok(result);
         } catch (Exception e) {
-            return ResponseEntity.status(500).body("Failed to upload file: " + e.getMessage());
+            return ResponseEntity.status(500).body(new GeneralResult(-1L, null, "Failed to upload file: " + e.getMessage()));
         }
     }
 
     @PutMapping("/{id}/disable")
-    public ResponseEntity<String> disableMedia(@PathVariable Long id) {
+    public ResponseEntity<GeneralResult> disableMedia(@PathVariable Long id) {
         boolean isDisabled = mediaService.disableMedia(id);
 
         if (isDisabled) {
-            return ResponseEntity.ok("Media record disabled successfully.");
+            return ResponseEntity.ok(new GeneralResult(1L, null, "File deleted successfully."));
         } else {
             return ResponseEntity.notFound().build();
         }
