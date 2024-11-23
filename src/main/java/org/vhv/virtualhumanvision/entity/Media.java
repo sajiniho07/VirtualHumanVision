@@ -22,6 +22,8 @@ public class Media {
     private String name;
     @Column(name = "path", columnDefinition = "NVARCHAR(1000)", nullable = false)
     private String path;
+    @Column(name = "original_path", columnDefinition = "NVARCHAR(1000)", nullable = false)
+    private String originalPath;
     @ManyToOne
     @JoinColumn(name = "media_typeid")
     private MediaType mediaType;

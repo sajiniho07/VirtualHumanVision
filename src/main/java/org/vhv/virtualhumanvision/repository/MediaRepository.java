@@ -7,4 +7,6 @@ import java.util.List;
 
 public interface MediaRepository extends JpaRepository<Media, Long> {
     List<Media> findAllByDisabledFalse();
+
+    List<Media> findTop5ByDisabledFalseAndMediaType_IdOrderByCreatedAtDesc(Long mediaTypeId);
 }

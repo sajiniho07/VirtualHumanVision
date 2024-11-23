@@ -22,9 +22,9 @@ public class MediaAPI {
     private final MediaService mediaService;
     private final MediaConfig mediaConfig;
 
-    @GetMapping("/")
-    public ResponseEntity<List<Media>> getMedias() {
-        return ResponseEntity.ok(mediaService.getMedias());
+    @GetMapping("/{mediaTypeId}")
+    public ResponseEntity<List<Media>> getTopFiveMediasByTypeId(@PathVariable Long mediaTypeId) {
+        return ResponseEntity.ok(mediaService.getTopFiveMediasByTypeId(mediaTypeId));
     }
 
     @PostMapping("/upload")
@@ -36,9 +36,8 @@ public class MediaAPI {
         try {
             File destinationFile = new File(mediaConfig.getUploadBaseDir() + File.separator + file.getOriginalFilename());
             file.transferTo(destinationFile);
-            Long mediaId = mediaService.save(destinationFile);
-            String path = mediaConfig.getMediaUrl() + destinationFile.getName();
-            GeneralResult result = new GeneralResult(mediaId, path, "File uploaded successfully.");
+            Media media = mediaService.save(destinationFile);
+            GeneralResult result = new GeneralResult(media.getId(), media.getPath(), "File uploaded successfully.");
             return ResponseEntity.ok(result);
         } catch (Exception e) {
             return ResponseEntity.status(500).body(new GeneralResult(-1L, null, "Failed to upload file: " + e.getMessage()));

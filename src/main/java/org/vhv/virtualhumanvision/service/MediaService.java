@@ -4,6 +4,7 @@ import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import org.vhv.virtualhumanvision.configuration.MediaConfig;
 import org.vhv.virtualhumanvision.entity.Media;
 import org.vhv.virtualhumanvision.entity.MediaType;
 import org.vhv.virtualhumanvision.enums.EnumMediaType;
@@ -23,13 +24,18 @@ import java.util.List;
 public class MediaService {
 
     private final MediaRepository mediaRepository;
+    private final MediaConfig mediaConfig;
 
     public List<Media> getMedias() {
         return mediaRepository.findAllByDisabledFalse();
     }
 
+    public List<Media> getTopFiveMediasByTypeId(Long mediaTypeId) {
+        return mediaRepository.findTop5ByDisabledFalseAndMediaType_IdOrderByCreatedAtDesc(mediaTypeId);
+    }
+
     @Transactional
-    public Long save(File destinationFile) {
+    public Media save(File destinationFile) {
         Media media = new Media();
         media.setName(destinationFile.getName());
         MediaType mediaType = new MediaType();
@@ -42,10 +48,12 @@ public class MediaService {
         mediaType.setId(mediaTypeId);
         mediaType.setName(mediaTypeName);
         media.setMediaType(mediaType);
-        media.setPath(destinationFile.getPath());
+        String path = mediaConfig.getMediaUrl() + destinationFile.getName();
+        media.setPath(path);
+        media.setOriginalPath(destinationFile.getPath());
         ZonedDateTime currentDateTime = ZonedDateTime.now();
         media.setCreatedAt(currentDateTime);
-        return mediaRepository.save(media).getId();
+        return mediaRepository.save(media);
     }
 
     private boolean isImageFile(File file) {
@@ -63,7 +71,7 @@ public class MediaService {
     public boolean disableMedia(Long id) {
         return mediaRepository.findById(id)
                 .map(media -> {
-                    removeFileFromServer(media.getPath());
+                    removeFileFromServer(media.getOriginalPath());
                     media.setDisabled(true);
                     media.setModifiedAt(ZonedDateTime.now());
                     mediaRepository.save(media);
