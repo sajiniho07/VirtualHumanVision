@@ -17,6 +17,7 @@ import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.time.ZonedDateTime;
 import java.util.List;
+import java.util.Optional;
 
 @Slf4j
 @Service
@@ -87,5 +88,9 @@ public class MediaService {
         } catch (IOException e) {
             log.error("Failed to delete file: " + e.getMessage());
         }
+    }
+
+    public Optional<Media> getMediasById(Long id) {
+        return mediaRepository.findByIdAndDisabledFalse(id);
     }
 }

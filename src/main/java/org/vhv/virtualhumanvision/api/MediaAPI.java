@@ -12,6 +12,7 @@ import org.vhv.virtualhumanvision.service.MediaService;
 
 import java.io.File;
 import java.util.List;
+import java.util.Optional;
 
 @RestController
 @RequiredArgsConstructor
@@ -22,9 +23,16 @@ public class MediaAPI {
     private final MediaService mediaService;
     private final MediaConfig mediaConfig;
 
-    @GetMapping("/{mediaTypeId}")
+    @GetMapping("/type/{mediaTypeId}")
     public ResponseEntity<List<Media>> getTopFiveMediasByTypeId(@PathVariable Long mediaTypeId) {
         return ResponseEntity.ok(mediaService.getTopFiveMediasByTypeId(mediaTypeId));
+    }
+
+    @GetMapping("/{id}")
+    public ResponseEntity<Media> getMediasById(@PathVariable Long id) {
+        Optional<Media> optionalMedia = mediaService.getMediasById(id);
+        return optionalMedia.map(ResponseEntity::ok)
+                .orElseGet(() -> ResponseEntity.notFound().build());
     }
 
     @PostMapping("/upload")
