@@ -7,6 +7,7 @@ import lombok.Data;
 import lombok.NoArgsConstructor;
 
 import java.time.ZonedDateTime;
+import java.util.List;
 
 @Entity(name = "Media")
 @Table(name = "media", schema = "media")
@@ -33,4 +34,7 @@ public class Media {
     private ZonedDateTime createdAt;
     @Column(name = "modified_at", columnDefinition = "DATETIME")
     private ZonedDateTime modifiedAt;
+
+    @OneToMany(mappedBy = "media", cascade = CascadeType.ALL, fetch = FetchType.LAZY)
+    private List<ParkingSlotInfo> parkingSlotInfos;
 }

@@ -1,4 +1,4 @@
-package org.vhv.virtualhumanvision.dto;
+package org.vhv.virtualhumanvision.dto.response;
 
 import lombok.*;
 

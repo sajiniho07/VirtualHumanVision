@@ -6,7 +6,7 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.web.multipart.MultipartFile;
 import org.vhv.virtualhumanvision.configuration.MediaConfig;
-import org.vhv.virtualhumanvision.dto.GeneralResult;
+import org.vhv.virtualhumanvision.dto.response.GeneralResult;
 import org.vhv.virtualhumanvision.entity.Media;
 import org.vhv.virtualhumanvision.service.MediaService;
 
