@@ -1,5 +1,6 @@
 package org.vhv.virtualhumanvision.entity;
 
+import com.fasterxml.jackson.annotation.JsonIgnore;
 import jakarta.persistence.*;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
@@ -28,6 +29,7 @@ public class ParkingSlotInfo {
     @Column(name = "created_at", columnDefinition = "DATETIME", nullable = false)
     private ZonedDateTime createdAt;
 
+    @JsonIgnore
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "media_id", nullable = false)
     private Media media;

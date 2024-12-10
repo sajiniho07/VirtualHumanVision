@@ -1,5 +1,6 @@
 package org.vhv.virtualhumanvision.entity;
 
+import com.fasterxml.jackson.annotation.JsonIgnore;
 import jakarta.persistence.*;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
@@ -26,6 +27,8 @@ public class CoordinatesInfo {
     private Double realX;
     @Column(name = "realY", columnDefinition = "FLOAT", nullable = false)
     private Double realY;
+
+    @JsonIgnore
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "parking_slot_id", nullable = false)
     private ParkingSlotInfo parkingSlotInfo;

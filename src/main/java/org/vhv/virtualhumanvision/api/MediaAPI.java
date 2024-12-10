@@ -6,13 +6,17 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.web.multipart.MultipartFile;
 import org.vhv.virtualhumanvision.configuration.MediaConfig;
+import org.vhv.virtualhumanvision.dto.response.CoordinatesInfoDTO;
 import org.vhv.virtualhumanvision.dto.response.GeneralResult;
+import org.vhv.virtualhumanvision.dto.response.MediaDTO;
+import org.vhv.virtualhumanvision.dto.response.ParkingSlotInfoDTO;
+import org.vhv.virtualhumanvision.entity.CoordinatesInfo;
 import org.vhv.virtualhumanvision.entity.Media;
+import org.vhv.virtualhumanvision.entity.ParkingSlotInfo;
 import org.vhv.virtualhumanvision.service.MediaService;
 
 import java.io.File;
 import java.util.List;
-import java.util.Optional;
 
 @RestController
 @RequiredArgsConstructor
@@ -24,15 +28,62 @@ public class MediaAPI {
     private final MediaConfig mediaConfig;
 
     @GetMapping("/type/{mediaTypeId}")
-    public ResponseEntity<List<Media>> getTopFiveMediasByTypeId(@PathVariable Long mediaTypeId) {
-        return ResponseEntity.ok(mediaService.getTopFiveMediasByTypeId(mediaTypeId));
+    public ResponseEntity<List<MediaDTO>> getTopFiveMediasByTypeId(@PathVariable Long mediaTypeId) {
+        List<Media> medias = mediaService.getTopFiveMediasByTypeId(mediaTypeId);
+        List<MediaDTO> mediaDTOS = medias.stream()
+                .map(this::convertToDtoForFindAll)
+                .toList();
+        return ResponseEntity.ok(mediaDTOS);
     }
 
     @GetMapping("/{id}")
-    public ResponseEntity<Media> getMediasById(@PathVariable Long id) {
-        Optional<Media> optionalMedia = mediaService.getMediasById(id);
-        return optionalMedia.map(ResponseEntity::ok)
+    public ResponseEntity<MediaDTO> getMediasById(@PathVariable Long id) {
+        return mediaService.getMediasById(id)
+                .map(this::convertToDto)
+                .map(ResponseEntity::ok)
                 .orElseGet(() -> ResponseEntity.notFound().build());
+    }
+
+    private MediaDTO convertToDtoForFindAll(Media media) {
+        return new MediaDTO(
+                media.getId(),
+                media.getName(),
+                media.getPath(),
+                null
+        );
+    }
+
+    private MediaDTO convertToDto(Media media) {
+        List<ParkingSlotInfoDTO> parkingSlotInfos = media.getParkingSlotInfos().stream()
+                .map(this::convertToParkingSlotInfoDto)
+                .toList();
+        return new MediaDTO(
+                media.getId(),
+                media.getName(),
+                media.getPath(),
+                parkingSlotInfos
+        );
+    }
+
+    private ParkingSlotInfoDTO convertToParkingSlotInfoDto(ParkingSlotInfo parkingSlotInfo) {
+        List<CoordinatesInfoDTO> coordinatesInfos = parkingSlotInfo.getCoordinatesInfos().stream()
+                .map(this::convertToCoordinatesInfoDto)
+                .toList();
+
+        return new ParkingSlotInfoDTO(
+                parkingSlotInfo.getIsEmpty(),
+                coordinatesInfos
+        );
+    }
+
+    private CoordinatesInfoDTO convertToCoordinatesInfoDto(CoordinatesInfo coordinatesInfo) {
+        return new CoordinatesInfoDTO(
+                coordinatesInfo.getPointOrder(),
+                coordinatesInfo.getX(),
+                coordinatesInfo.getY(),
+                coordinatesInfo.getRealX(),
+                coordinatesInfo.getRealY()
+        );
     }
 
     @PostMapping("/upload")

@@ -10,6 +10,7 @@ import org.vhv.virtualhumanvision.dto.request.PointInfo;
 import org.vhv.virtualhumanvision.entity.CoordinatesInfo;
 import org.vhv.virtualhumanvision.entity.Media;
 import org.vhv.virtualhumanvision.entity.ParkingSlotInfo;
+import org.vhv.virtualhumanvision.repository.CoordinatesInfoRepository;
 import org.vhv.virtualhumanvision.repository.MediaRepository;
 import org.vhv.virtualhumanvision.repository.ParkingSlotInfoRepository;
 
@@ -23,12 +24,15 @@ public class ParkingSlotService {
 
     private final MediaRepository mediaRepository;
     private final ParkingSlotInfoRepository parkingSlotInfoRepository;
+    private final CoordinatesInfoRepository coordinatesInfoRepository;
 
     @Transactional
     public void saveAndTrainModel(ParkingTrainingRequest request) {
-        Media media = mediaRepository.findById(request.getMediaId())
+        Long mediaId = request.getMediaId();
+        Media media = mediaRepository.findById(mediaId)
                 .orElseThrow(() -> new RuntimeException("Media not found"));
-///todo remove prev
+
+        parkingSlotInfoRepository.deleteByMediaIdAndIsTrain(mediaId);
         ZonedDateTime currentDatetime = ZonedDateTime.now();
 
         List<ParkingSlotInfo> parkingSlots = request.getSlotDetails().stream()
