@@ -27,12 +27,19 @@ public class MediaService {
     private final MediaRepository mediaRepository;
     private final MediaConfig mediaConfig;
 
+    @Transactional(readOnly = true)
     public List<Media> getMedias() {
         return mediaRepository.findAllByDisabledFalse();
     }
 
+    @Transactional(readOnly = true)
     public List<Media> getTopFiveMediasByTypeId(Long mediaTypeId) {
         return mediaRepository.findTop5ByDisabledFalseAndMediaType_IdOrderByCreatedAtDesc(mediaTypeId);
+    }
+
+    @Transactional(readOnly = true)
+    public Optional<Media> getMediaByRefId(Long refId) {
+        return mediaRepository.findByRefIdAndAndDisabledFalse(refId);
     }
 
     @Transactional
@@ -48,6 +55,23 @@ public class MediaService {
         }
         mediaType.setId(mediaTypeId);
         mediaType.setName(mediaTypeName);
+        media.setMediaType(mediaType);
+        String path = mediaConfig.getMediaUrl() + destinationFile.getName();
+        media.setPath(path);
+        media.setOriginalPath(destinationFile.getPath());
+        ZonedDateTime currentDateTime = ZonedDateTime.now();
+        media.setCreatedAt(currentDateTime);
+        return mediaRepository.save(media);
+    }
+
+    @Transactional
+    public Media saveByMediaTypeAndRefId(File destinationFile, EnumMediaType mediaTypeItem, Long refId) {
+        Media media = new Media();
+        media.setName(destinationFile.getName());
+        media.setRefId(refId);
+        MediaType mediaType = new MediaType();
+        mediaType.setId(mediaTypeItem.getId());
+        mediaType.setName(mediaTypeItem.getName());
         media.setMediaType(mediaType);
         String path = mediaConfig.getMediaUrl() + destinationFile.getName();
         media.setPath(path);
@@ -90,6 +114,7 @@ public class MediaService {
         }
     }
 
+    @Transactional(readOnly = true)
     public Optional<Media> getMediasById(Long id) {
         return mediaRepository.findByIdAndDisabledFalse(id);
     }

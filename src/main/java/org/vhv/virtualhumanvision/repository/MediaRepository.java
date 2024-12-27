@@ -13,4 +13,5 @@ public interface MediaRepository extends JpaRepository<Media, Long> {
 
     Optional<Media> findByIdAndDisabledFalse(Long id);
 
+    Optional<Media> findByRefIdAndAndDisabledFalse(Long refId);
 }

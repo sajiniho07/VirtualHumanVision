@@ -3,7 +3,8 @@ package org.vhv.virtualhumanvision.enums;
 public enum EnumMediaType {
     VIDEO(1, "video"),
     STREAM(2, "stream"),
-    IMAGE(3, "image");
+    IMAGE(3, "image"),
+    ARFF(4, "arff");
 
     private long id;
     private String name;

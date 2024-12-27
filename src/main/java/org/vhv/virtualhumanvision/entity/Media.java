@@ -23,6 +23,8 @@ public class Media {
     private String name;
     @Column(name = "path", columnDefinition = "NVARCHAR(1000)", nullable = false)
     private String path;
+    @Column(name = "ref_id", columnDefinition = "BigInt")
+    private Long refId;
     @Column(name = "original_path", columnDefinition = "NVARCHAR(1000)", nullable = false)
     private String originalPath;
     @ManyToOne
