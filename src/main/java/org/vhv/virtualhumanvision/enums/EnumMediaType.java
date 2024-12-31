@@ -4,7 +4,7 @@ public enum EnumMediaType {
     VIDEO(1, "video"),
     STREAM(2, "stream"),
     IMAGE(3, "image"),
-    ARFF(4, "arff");
+    MODEL(4, "model");
 
     private long id;
     private String name;

@@ -15,11 +15,8 @@ import org.vhv.virtualhumanvision.dto.request.ParkingSlotDetail;
 import org.vhv.virtualhumanvision.dto.request.ParkingTrainingRequest;
 import org.vhv.virtualhumanvision.dto.request.PointInfo;
 import org.vhv.virtualhumanvision.entity.Media;
-import weka.core.Attribute;
-import weka.core.DenseInstance;
-import weka.core.Instance;
-import weka.core.Instances;
-import weka.core.converters.ArffSaver;
+import weka.classifiers.functions.SMO;
+import weka.core.*;
 
 import java.io.File;
 import java.text.DecimalFormat;
@@ -35,23 +32,42 @@ public class ImageProcessingService {
 
     private final MediaConfig mediaConfig;
     private final MediaService mediaService;
-    private final String TRAIN_FILE_NAME_PREFIX = "ParkingSlotTrain_";
+    private final String Model_FILE_NAME_PREFIX = "ParkingSlotModel_";
 
-    public File generateTrainArffFile(ParkingTrainingRequest request, String mediaOriginalPath) {
+    public File generateModelFile(ParkingTrainingRequest request, String mediaOriginalPath) {
         Long mediaId = request.getMediaId();
-        disablePrevArffFileIfExists(mediaId);
+        disablePrevTrainModelIfExists(mediaId);
+
         Mat image = loadImage(mediaOriginalPath);
         List<Attribute> attributes = createAttributes();
-        Instances data = initializeInstances(attributes);
+        Instances dataset = initializeInstances(attributes);
 
         for (ParkingSlotDetail slotDetail : request.getSlotDetails()) {
-            processSlotDetail(slotDetail, image, data);
+            processSlotDetail(slotDetail, image, dataset);
         }
 
-        return saveArffFile(mediaId, data);
+        return generateModel(dataset, mediaId);
     }
 
-    private void disablePrevArffFileIfExists(Long mediaId) {
+    private File generateModel(Instances dataset, Long mediaId) {
+        try {
+            dataset.setClassIndex(dataset.numAttributes() - 1);
+
+            SMO svmReg = new SMO();
+            svmReg.buildClassifier(dataset);
+
+            String modelFilePath = mediaConfig.getTrainModelBaseDir() + File.separator +
+                    Model_FILE_NAME_PREFIX + mediaId + ".model";
+            SerializationHelper.write(modelFilePath, svmReg);
+
+            return new File(modelFilePath);
+        } catch (Exception e) {
+            log.error(e.getMessage());
+            return null;
+        }
+    }
+
+    private void disablePrevTrainModelIfExists(Long mediaId) {
         Optional<Media> mediaByRefId = mediaService.getMediaByRefId(mediaId);
         mediaByRefId.ifPresent(media -> mediaService.disableMedia(media.getId()));
     }
@@ -125,22 +141,6 @@ public class ImageProcessingService {
         instance.setValue(data.attribute(numAttributes - 1), isEmptyValue);
 
         data.add(instance);
-    }
-
-    private File saveArffFile(Long mediaId, Instances data) {
-        try {
-            ArffSaver saver = new ArffSaver();
-            saver.setInstances(data);
-            File outputFile = new File(mediaConfig.getTrainModelBaseDir() + File.separator +
-                    TRAIN_FILE_NAME_PREFIX + mediaId + ".arff");
-            saver.setFile(outputFile);
-            saver.writeBatch();
-            return outputFile;
-
-        } catch (Exception e) {
-            log.error("Error saving ARFF file: {}", e.getMessage());
-            return null;
-        }
     }
 
     private List<Point> extractPoints(ParkingSlotDetail slotDetail) {

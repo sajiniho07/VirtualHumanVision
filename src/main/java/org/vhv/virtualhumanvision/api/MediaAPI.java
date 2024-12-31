@@ -31,34 +31,44 @@ public class MediaAPI {
     public ResponseEntity<List<MediaDTO>> getTopFiveMediasByTypeId(@PathVariable Long mediaTypeId) {
         List<Media> medias = mediaService.getTopFiveMediasByTypeId(mediaTypeId);
         List<MediaDTO> mediaDTOS = medias.stream()
-                .map(this::convertToDtoForFindAll)
+                .map(this::convertToDto)
                 .toList();
         return ResponseEntity.ok(mediaDTOS);
     }
 
-    @GetMapping("/{id}")
-    public ResponseEntity<MediaDTO> getMediasById(@PathVariable Long id) {
-        return mediaService.getMediasById(id)
+    @GetMapping("/refId/{refId}")
+    public ResponseEntity<MediaDTO> getMediaByRefId(@PathVariable Long refId) {
+        return mediaService.getMediaByRefId(refId)
                 .map(this::convertToDto)
                 .map(ResponseEntity::ok)
                 .orElseGet(() -> ResponseEntity.notFound().build());
     }
 
-    private MediaDTO convertToDtoForFindAll(Media media) {
+    @GetMapping("/{id}")
+    public ResponseEntity<MediaDTO> getMediasById(@PathVariable Long id) {
+        return mediaService.getMediasById(id)
+                .map(this::convertToDtoFullData)
+                .map(ResponseEntity::ok)
+                .orElseGet(() -> ResponseEntity.notFound().build());
+    }
+
+    private MediaDTO convertToDto(Media media) {
         return new MediaDTO(
                 media.getId(),
+                media.getRefId(),
                 media.getName(),
                 media.getPath(),
                 null
         );
     }
 
-    private MediaDTO convertToDto(Media media) {
+    private MediaDTO convertToDtoFullData(Media media) {
         List<ParkingSlotInfoDTO> parkingSlotInfos = media.getParkingSlotInfos().stream()
                 .map(this::convertToParkingSlotInfoDto)
                 .toList();
         return new MediaDTO(
                 media.getId(),
+                media.getRefId(),
                 media.getName(),
                 media.getPath(),
                 parkingSlotInfos
