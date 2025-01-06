@@ -6,9 +6,13 @@ import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 import org.vhv.virtualhumanvision.entity.ParkingSlotInfo;
 
+import java.util.List;
+
 public interface ParkingSlotInfoRepository extends JpaRepository<ParkingSlotInfo, Long> {
 
     @Modifying
     @Query("DELETE FROM ParkingSlotInfo psi WHERE psi.media.id = :mediaId AND psi.isTrain = true")
     void deleteByMediaIdAndIsTrain(@Param("mediaId") Long mediaId);
+
+    List<ParkingSlotInfo> findAllByMedia_Id(Long mediaId);
 }

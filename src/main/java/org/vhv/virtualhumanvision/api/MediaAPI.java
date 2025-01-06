@@ -13,6 +13,8 @@ import org.vhv.virtualhumanvision.dto.response.ParkingSlotInfoDTO;
 import org.vhv.virtualhumanvision.entity.CoordinatesInfo;
 import org.vhv.virtualhumanvision.entity.Media;
 import org.vhv.virtualhumanvision.entity.ParkingSlotInfo;
+import org.vhv.virtualhumanvision.enums.EnumMediaType;
+import org.vhv.virtualhumanvision.service.ImageProcessingService;
 import org.vhv.virtualhumanvision.service.MediaService;
 
 import java.io.File;
@@ -26,6 +28,7 @@ public class MediaAPI {
 
     private final MediaService mediaService;
     private final MediaConfig mediaConfig;
+    private final ImageProcessingService imageProcessingService;
 
     @GetMapping("/type/{mediaTypeId}")
     public ResponseEntity<List<MediaDTO>> getTopFiveMediasByTypeId(@PathVariable Long mediaTypeId) {
@@ -36,17 +39,35 @@ public class MediaAPI {
         return ResponseEntity.ok(mediaDTOS);
     }
 
-    @GetMapping("/refId/{refId}")
-    public ResponseEntity<MediaDTO> getMediaByRefId(@PathVariable Long refId) {
-        return mediaService.getMediaByRefId(refId)
+    @GetMapping("/getMediaByRefIdAndMediaTypeId")
+    public ResponseEntity<List<MediaDTO>> getMediaByRefIdAndMediaTypeId(@RequestParam Long refId,
+                                                                        @RequestParam Long mediaTypeId) {
+        List<Media> medias = mediaService.getMediaByRefIdAndMediaTypeId(refId, mediaTypeId);
+        List<MediaDTO> mediaDTOS = medias.stream()
                 .map(this::convertToDto)
-                .map(ResponseEntity::ok)
-                .orElseGet(() -> ResponseEntity.notFound().build());
+                .toList();
+        return ResponseEntity.ok(mediaDTOS);
+    }
+
+    @GetMapping("/getParkingSlotDetectorResult")
+    public ResponseEntity<GeneralResult> getParkingSlotDetectorResult(@RequestParam Long mediaId,
+                                                                      @RequestParam Long modelId) {
+        File resultFile = imageProcessingService.getParkingSlotDetectorResult(mediaId, modelId);
+        if (resultFile == null || !resultFile.exists()) {
+            throw new RuntimeException("Result file generation failed.");
+        }
+        try {
+            Media resultMedia = mediaService.save(resultFile);
+            GeneralResult result = new GeneralResult(resultMedia.getId(), resultMedia.getPath(), "Result file generated successfully.");
+            return ResponseEntity.ok(result);
+        } catch (Exception e) {
+            return ResponseEntity.status(500).body(new GeneralResult(-1L, null, "Failed to generate result file: " + e.getMessage()));
+        }
     }
 
     @GetMapping("/{id}")
-    public ResponseEntity<MediaDTO> getMediasById(@PathVariable Long id) {
-        return mediaService.getMediasById(id)
+    public ResponseEntity<MediaDTO> getMediaById(@PathVariable Long id) {
+        return mediaService.getMediaById(id)
                 .map(this::convertToDtoFullData)
                 .map(ResponseEntity::ok)
                 .orElseGet(() -> ResponseEntity.notFound().build());
@@ -111,6 +132,29 @@ public class MediaAPI {
         } catch (Exception e) {
             return ResponseEntity.status(500).body(new GeneralResult(-1L, null, "Failed to upload file: " + e.getMessage()));
         }
+    }
+
+    @PostMapping("/upload/{refId}")
+    public ResponseEntity<GeneralResult> upload(@RequestParam("file") MultipartFile file, @PathVariable Long refId) {
+        if (file.isEmpty()) {
+            return ResponseEntity.badRequest().body(new GeneralResult(-1L, "", "Please select a file to upload."));
+        } else if (!isVideoFile(file.getContentType())) {
+            return ResponseEntity.badRequest().body(new GeneralResult(-1L, "", "Uploaded file is not a valid video format."));
+        }
+
+        try {
+            File destinationFile = new File(mediaConfig.getUploadBaseDir() + File.separator + file.getOriginalFilename());
+            file.transferTo(destinationFile);
+            Media media = mediaService.saveByMediaTypeAndRefId(destinationFile, EnumMediaType.VIDEO, refId);
+            GeneralResult result = new GeneralResult(media.getId(), media.getPath(), "File uploaded successfully.");
+            return ResponseEntity.ok(result);
+        } catch (Exception e) {
+            return ResponseEntity.status(500).body(new GeneralResult(-1L, null, "Failed to upload file: " + e.getMessage()));
+        }
+    }
+
+    private boolean isVideoFile(String contentType) {
+        return contentType != null && (contentType.startsWith("video/"));
     }
 
     @PutMapping("/{id}/disable")

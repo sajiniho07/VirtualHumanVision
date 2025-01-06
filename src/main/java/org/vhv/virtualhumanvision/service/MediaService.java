@@ -38,8 +38,8 @@ public class MediaService {
     }
 
     @Transactional(readOnly = true)
-    public Optional<Media> getMediaByRefId(Long refId) {
-        return mediaRepository.findByRefIdAndAndDisabledFalse(refId);
+    public List<Media> getMediaByRefIdAndMediaTypeId(Long refId, Long mediaTypeId) {
+        return mediaRepository.findByRefIdAndDisabledFalseAndMediaType_IdOrderByCreatedAtDesc(refId, mediaTypeId);
     }
 
     @Transactional
@@ -94,15 +94,26 @@ public class MediaService {
 
     @Transactional
     public boolean disableMedia(Long id) {
+        disableMediaByRefId(id);
+        return disableSingleMedia(id);
+    }
+
+    private void disableMediaByRefId(Long refId) {
+        mediaRepository.findByRefIdAndDisabledFalse(refId).forEach(this::disableMediaItem);
+    }
+
+    private boolean disableSingleMedia(Long id) {
         return mediaRepository.findById(id)
-                .map(media -> {
-                    removeFileFromServer(media.getOriginalPath());
-                    media.setDisabled(true);
-                    media.setModifiedAt(ZonedDateTime.now());
-                    mediaRepository.save(media);
-                    return true;
-                })
+                .map(this::disableMediaItem)
                 .orElse(false);
+    }
+
+    private boolean disableMediaItem(Media media) {
+        removeFileFromServer(media.getOriginalPath());
+        media.setDisabled(true);
+        media.setModifiedAt(ZonedDateTime.now());
+        mediaRepository.save(media);
+        return true;
     }
 
     private void removeFileFromServer(String filePath) {
@@ -115,7 +126,7 @@ public class MediaService {
     }
 
     @Transactional(readOnly = true)
-    public Optional<Media> getMediasById(Long id) {
+    public Optional<Media> getMediaById(Long id) {
         return mediaRepository.findByIdAndDisabledFalse(id);
     }
 }

@@ -5,16 +5,22 @@ import lombok.extern.slf4j.Slf4j;
 import org.apache.commons.math3.linear.MatrixUtils;
 import org.apache.commons.math3.linear.RealMatrix;
 import org.apache.commons.math3.linear.SingularValueDecomposition;
-import org.opencv.core.Mat;
-import org.opencv.core.Point;
-import org.opencv.core.Rect;
+import org.opencv.core.*;
 import org.opencv.imgcodecs.Imgcodecs;
+import org.opencv.imgproc.Imgproc;
+import org.opencv.videoio.VideoCapture;
+import org.opencv.videoio.VideoWriter;
+import org.opencv.videoio.Videoio;
 import org.springframework.stereotype.Service;
 import org.vhv.virtualhumanvision.configuration.MediaConfig;
 import org.vhv.virtualhumanvision.dto.request.ParkingSlotDetail;
 import org.vhv.virtualhumanvision.dto.request.ParkingTrainingRequest;
 import org.vhv.virtualhumanvision.dto.request.PointInfo;
+import org.vhv.virtualhumanvision.entity.CoordinatesInfo;
 import org.vhv.virtualhumanvision.entity.Media;
+import org.vhv.virtualhumanvision.entity.ParkingSlotInfo;
+import org.vhv.virtualhumanvision.enums.EnumMediaType;
+import org.vhv.virtualhumanvision.repository.ParkingSlotInfoRepository;
 import weka.classifiers.functions.SMO;
 import weka.core.*;
 
@@ -23,7 +29,7 @@ import java.text.DecimalFormat;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
-import java.util.Optional;
+import java.util.Objects;
 
 @Slf4j
 @Service
@@ -32,7 +38,7 @@ public class ImageProcessingService {
 
     private final MediaConfig mediaConfig;
     private final MediaService mediaService;
-    private final String Model_FILE_NAME_PREFIX = "ParkingSlotModel_";
+    private final ParkingSlotInfoRepository parkingSlotInfoRepository;
 
     public File generateModelFile(ParkingTrainingRequest request, String mediaOriginalPath) {
         Long mediaId = request.getMediaId();
@@ -43,7 +49,10 @@ public class ImageProcessingService {
         Instances dataset = initializeInstances(attributes);
 
         for (ParkingSlotDetail slotDetail : request.getSlotDetails()) {
-            processSlotDetail(slotDetail, image, dataset);
+            List<Point> points = extractPoints(slotDetail);
+            Rect rectCrop = createRect(points);
+            Mat croppedImage = new Mat(image, rectCrop);
+            processSlotDetail(slotDetail, croppedImage, dataset);
         }
 
         return generateModel(dataset, mediaId);
@@ -56,8 +65,7 @@ public class ImageProcessingService {
             SMO svmReg = new SMO();
             svmReg.buildClassifier(dataset);
 
-            String modelFilePath = mediaConfig.getTrainModelBaseDir() + File.separator +
-                    Model_FILE_NAME_PREFIX + mediaId + ".model";
+            String modelFilePath = mediaConfig.getUploadBaseDir() + File.separator + "ParkingSlotModel_" + mediaId + ".model";
             SerializationHelper.write(modelFilePath, svmReg);
 
             return new File(modelFilePath);
@@ -67,17 +75,46 @@ public class ImageProcessingService {
         }
     }
 
-    private void disablePrevTrainModelIfExists(Long mediaId) {
-        Optional<Media> mediaByRefId = mediaService.getMediaByRefId(mediaId);
-        mediaByRefId.ifPresent(media -> mediaService.disableMedia(media.getId()));
+    private void disablePrevTrainModelIfExists(Long refId) {
+        List<Media> mediaByRefId = mediaService.getMediaByRefIdAndMediaTypeId(refId, EnumMediaType.MODEL.getId());
+        mediaByRefId.forEach(media -> {
+            try {
+                mediaService.disableMedia(media.getId());
+            } catch (Exception e) {
+                log.error("Failed to disable media with ID: " + media.getId(), e);
+            }
+        });
     }
 
     private Mat loadImage(String mediaOriginalPath) {
-        Mat image = Imgcodecs.imread(mediaOriginalPath, Imgcodecs.IMREAD_GRAYSCALE);
+        Mat image = Imgcodecs.imread(mediaOriginalPath);
         if (image.empty()) {
             throw new RuntimeException("Failed to load image.");
         }
-        return image;
+        return getNormalizedImage(image);
+    }
+
+    private static Mat getNormalizedImage(Mat image) {
+        Mat grayImage = new Mat();
+        Imgproc.cvtColor(image, grayImage, Imgproc.COLOR_BGR2GRAY);
+
+        Mat blurredImage = new Mat();
+        Imgproc.GaussianBlur(grayImage, blurredImage, new org.opencv.core.Size(3, 3), 1);
+
+        Mat thresholdImage = new Mat();
+        Imgproc.adaptiveThreshold(
+                blurredImage,
+                thresholdImage,
+                255,
+                Imgproc.ADAPTIVE_THRESH_GAUSSIAN_C,
+                Imgproc.THRESH_BINARY_INV,
+                25,
+                16
+        );
+
+        Mat medianBlurredImage = new Mat();
+        Imgproc.medianBlur(thresholdImage, medianBlurredImage, 5);
+        return medianBlurredImage;
     }
 
     private List<Attribute> createAttributes() {
@@ -101,10 +138,7 @@ public class ImageProcessingService {
         return data;
     }
 
-    private void processSlotDetail(ParkingSlotDetail slotDetail, Mat image, Instances data) {
-        List<Point> points = extractPoints(slotDetail);
-        Mat croppedImage = cropImage(image, points);
-
+    private void processSlotDetail(ParkingSlotDetail slotDetail, Mat croppedImage, Instances data) {
         double[][] matrix = convertImageToMatrix(croppedImage);
         String[] principalComponents = performPCA(matrix);
 
@@ -137,8 +171,10 @@ public class ImageProcessingService {
             }
         }
 
-        String isEmptyValue = Boolean.TRUE.equals(slotDetail.getIsEmpty()) ? "true" : "false";
-        instance.setValue(data.attribute(numAttributes - 1), isEmptyValue);
+        if (slotDetail.getIsEmpty() != null) {
+            String isEmptyValue = Boolean.TRUE.equals(slotDetail.getIsEmpty()) ? "true" : "false";
+            instance.setValue(data.attribute(numAttributes - 1), isEmptyValue);
+        }
 
         data.add(instance);
     }
@@ -228,18 +264,158 @@ public class ImageProcessingService {
         return sum / (uRows * uCols);
     }
 
-    private Mat cropImage(Mat image, List<Point> points) {
+    private Rect createRect(List<Point> points) {
         int startX = (int) Math.min(Math.min(points.get(0).x, points.get(1).x), Math.min(points.get(2).x, points.get(3).x));
         int startY = (int) Math.min(Math.min(points.get(0).y, points.get(1).y), Math.min(points.get(2).y, points.get(3).y));
         int endX = (int) Math.max(Math.max(points.get(0).x, points.get(1).x), Math.max(points.get(2).x, points.get(3).x));
         int endY = (int) Math.max(Math.max(points.get(0).y, points.get(1).y), Math.max(points.get(2).y, points.get(3).y));
 
-        Rect rectCrop = new Rect(startX, startY, endX - startX, endY - startY);
-        return new Mat(image, rectCrop);
+        return new Rect(startX, startY, endX - startX, endY - startY);
     }
 
     public static int roundToNearestMultipleOfThree(int num) {
         return (num / 3) * 3;
     }
 
+    public File getParkingSlotDetectorResult(Long mediaId, Long modelId) {
+        Media testMedia = fetchMedia(mediaId, "Test media not found");
+        Media model = fetchMedia(modelId, "Related model not found");
+
+        if (!Objects.equals(testMedia.getRefId(), model.getRefId())) {
+            throw new RuntimeException("Model and test media file are not related.");
+        }
+
+        Long modelRefId = model.getRefId();
+        List<ParkingSlotInfo> parkingSlotInfoList = fetchParkingSlotInfo(modelRefId);
+
+        SMO svmModel = loadSvmModel(model.getOriginalPath());
+        VideoCapture video = openVideoFile(testMedia.getOriginalPath());
+
+        String outputVideoPath = mediaConfig.getUploadBaseDir() + File.separator + "processed_video_" + modelRefId + ".avi";
+        VideoWriter videoWriter = initializeVideoWriter(outputVideoPath, video);
+
+        processVideoFrames(video, videoWriter, parkingSlotInfoList, svmModel);
+
+        video.release();
+        videoWriter.release();
+        return new File(outputVideoPath);
+    }
+
+    private Media fetchMedia(Long mediaId, String errorMessage) {
+        return mediaService.getMediaById(mediaId)
+                .orElseThrow(() -> new RuntimeException(errorMessage));
+    }
+
+
+    private List<ParkingSlotInfo> fetchParkingSlotInfo(Long mediaId) {
+        List<ParkingSlotInfo> parkingSlotInfoList = parkingSlotInfoRepository.findAllByMedia_Id(mediaId);
+        if (parkingSlotInfoList.isEmpty()) {
+            throw new RuntimeException("Slot info not found.");
+        }
+        return parkingSlotInfoList;
+    }
+
+    private SMO loadSvmModel(String modelPath) {
+        try {
+            return (SMO) SerializationHelper.read(modelPath);
+        } catch (Exception e) {
+            throw new RuntimeException("Failed to load model.", e);
+        }
+    }
+
+    private VideoCapture openVideoFile(String videoPath) {
+        VideoCapture video = new VideoCapture(videoPath);
+        if (!video.isOpened()) {
+            throw new RuntimeException("Failed to open video file.");
+        }
+        return video;
+    }
+
+    private VideoWriter initializeVideoWriter(String outputVideoPath, VideoCapture video) {
+        int frameWidth = (int) video.get(Videoio.CAP_PROP_FRAME_WIDTH);
+        int frameHeight = (int) video.get(Videoio.CAP_PROP_FRAME_HEIGHT);
+        double fps = video.get(Videoio.CAP_PROP_FPS);
+
+        VideoWriter videoWriter = new VideoWriter(outputVideoPath, VideoWriter.fourcc('M', 'J', 'P', 'G'), fps, new Size(frameWidth, frameHeight));
+
+        if (!videoWriter.isOpened()) {
+            throw new RuntimeException("Failed to create video writer.");
+        }
+
+        return videoWriter;
+    }
+
+    private void processVideoFrames(VideoCapture video, VideoWriter videoWriter, List<ParkingSlotInfo> parkingSlotInfoList, SMO svmModel) {
+        Mat frame = new Mat();
+        int frameCounter = 0;
+        List<Double> lastPredictions = new ArrayList<>();
+        List<Rect> lastRects = new ArrayList<>();
+        double fps = video.get(Videoio.CAP_PROP_FPS);
+
+        while (video.read(frame)) {
+            boolean processFrame = (frameCounter % (int) (fps * 1) == 0);
+            frameCounter++;
+
+            if (processFrame) {
+                lastRects.clear();
+                lastPredictions.clear();
+
+                List<Attribute> attributes = createAttributes();
+                Instances dataset = initializeInstances(attributes);
+                Mat normalizedImage = getNormalizedImage(frame);
+
+                for (ParkingSlotInfo slotInfo : parkingSlotInfoList) {
+                    ParkingSlotDetail parkingSlotDetail = mapToParkingSlotDetail(slotInfo);
+                    Rect rectCrop = createRect(extractPoints(parkingSlotDetail));
+                    Mat croppedImage = new Mat(normalizedImage, rectCrop);
+                    processSlotDetail(parkingSlotDetail, croppedImage, dataset);
+                    lastRects.add(rectCrop);
+                }
+
+                classifyInstances(dataset, svmModel, lastPredictions);
+            }
+
+            drawPredictionsOnFrame(frame, lastRects, lastPredictions);
+            videoWriter.write(frame);
+        }
+    }
+
+    private void classifyInstances(Instances dataset, SMO svmModel, List<Double> predictions) {
+        for (int i = 0; i < dataset.numInstances(); i++) {
+            Instance instance = dataset.instance(i);
+            try {
+                predictions.add(svmModel.classifyInstance(instance));
+            } catch (Exception e) {
+                throw new RuntimeException("Failed to predict using the model.", e);
+            }
+        }
+    }
+
+    private void drawPredictionsOnFrame(Mat frame, List<Rect> lastRects, List<Double> lastPredictions) {
+        for (int i = 0; i < lastRects.size(); i++) {
+            Rect slotRect = lastRects.get(i);
+            Scalar color = lastPredictions.get(i).equals(1.0) ? new Scalar(0, 0, 255) : new Scalar(0, 255, 0);
+            Imgproc.rectangle(frame, slotRect.tl(), slotRect.br(), color, 2);
+        }
+    }
+
+    private ParkingSlotDetail mapToParkingSlotDetail(ParkingSlotInfo slotInfo) {
+        List<PointInfo> points = slotInfo.getCoordinatesInfos().stream()
+                .map(this::mapToPointInfo)
+                .toList();
+
+        ParkingSlotDetail parkingSlotDetail = new ParkingSlotDetail();
+        parkingSlotDetail.setPoints(points);
+        return parkingSlotDetail;
+    }
+
+    private PointInfo mapToPointInfo(CoordinatesInfo coordinatesInfo) {
+        return new PointInfo(
+                coordinatesInfo.getId().intValue(),
+                coordinatesInfo.getX(),
+                coordinatesInfo.getY(),
+                coordinatesInfo.getRealX(),
+                coordinatesInfo.getRealY()
+        );
+    }
 }

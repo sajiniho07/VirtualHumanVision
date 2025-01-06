@@ -13,7 +13,4 @@ public class MediaConfig {
 
     @Value("${media.upload-base-dir}")
     private String uploadBaseDir;
-
-    @Value("${media.train-model-base-dir}")
-    private String trainModelBaseDir;
 }

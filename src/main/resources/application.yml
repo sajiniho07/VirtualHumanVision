@@ -16,4 +16,3 @@ spring:
 media:
   url: http://localhost/media/
   upload-base-dir: D:\final project dba\server\res
-  train-model-base-dir: D:\final project dba\server\res\train
