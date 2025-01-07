@@ -291,7 +291,7 @@ public class ImageProcessingService {
         SMO svmModel = loadSvmModel(model.getOriginalPath());
         VideoCapture video = openVideoFile(testMedia.getOriginalPath());
 
-        String outputVideoPath = mediaConfig.getUploadBaseDir() + File.separator + "processed_video_" + modelRefId + ".avi";
+        String outputVideoPath = mediaConfig.getUploadBaseDir() + File.separator + "processed_video_" + modelRefId + ".mp4";
         VideoWriter videoWriter = initializeVideoWriter(outputVideoPath, video);
 
         processVideoFrames(video, videoWriter, parkingSlotInfoList, svmModel);
@@ -336,7 +336,7 @@ public class ImageProcessingService {
         int frameHeight = (int) video.get(Videoio.CAP_PROP_FRAME_HEIGHT);
         double fps = video.get(Videoio.CAP_PROP_FPS);
 
-        VideoWriter videoWriter = new VideoWriter(outputVideoPath, VideoWriter.fourcc('M', 'J', 'P', 'G'), fps, new Size(frameWidth, frameHeight));
+        VideoWriter videoWriter = new VideoWriter(outputVideoPath, VideoWriter.fourcc('H', '2', '6', '4'), fps, new Size(frameWidth, frameHeight));
 
         if (!videoWriter.isOpened()) {
             throw new RuntimeException("Failed to create video writer.");
@@ -353,7 +353,7 @@ public class ImageProcessingService {
         double fps = video.get(Videoio.CAP_PROP_FPS);
 
         while (video.read(frame)) {
-            boolean processFrame = (frameCounter % (int) (fps * 1) == 0);
+            boolean processFrame = (frameCounter % (int) (fps * 1.5) == 0);
             frameCounter++;
 
             if (processFrame) {
