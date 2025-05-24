@@ -17,11 +17,12 @@ public class PersonService {
     private final PersonRepository personRepository;
 
     @Transactional
-    public void createPerson(String name) {
+    public Long createPerson(String name) {
         Person person = new Person();
         person.setName(name);
         person.setCreatedAt(LocalDateTime.now());
         personRepository.save(person);
+        return person.getId();
     }
 
     @Transactional(readOnly = true)

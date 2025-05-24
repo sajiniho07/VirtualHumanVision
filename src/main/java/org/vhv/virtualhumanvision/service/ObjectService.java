@@ -18,12 +18,12 @@ public class ObjectService {
     private final ObjectRepository objectRepository;
 
     @Transactional
-    public String createObject(String name) {
+    public Long createObject(String name) {
         VhvObject vhvObject = new VhvObject();
         vhvObject.setName(name);
         vhvObject.setCreatedAt(LocalDateTime.now());
         objectRepository.save(vhvObject);
-        return "Object added: " + vhvObject.getName();
+        return vhvObject.getId();
     }
 
     @Transactional(readOnly = true)

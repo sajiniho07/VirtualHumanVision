@@ -15,12 +15,10 @@ import org.vhv.virtualhumanvision.dto.request.AddTextRequest;
 import org.vhv.virtualhumanvision.dto.response.DetectionDto;
 import org.vhv.virtualhumanvision.dto.response.ObjectDto;
 import org.vhv.virtualhumanvision.dto.response.PersonDto;
-import org.vhv.virtualhumanvision.entity.Person;
 import org.vhv.virtualhumanvision.enums.ObjectType;
 import org.vhv.virtualhumanvision.service.*;
 
 import java.io.IOException;
-import java.time.LocalDateTime;
 import java.util.List;
 
 @RestController
@@ -133,5 +131,29 @@ public class VisionController {
     @GetMapping("/detections")
     public ResponseEntity<List<DetectionDto>> getDetections() {
         return ResponseEntity.ok(detectionService.getAllDetections());
+    }
+
+    @Operation(summary = "Add a new entity with image", description = "Creates a new person or object with an associated image and registers a detection.")
+    @ApiResponses(value = {
+            @ApiResponse(responseCode = "200", description = "Successfully added"),
+            @ApiResponse(responseCode = "400", description = "Invalid request data")
+    })
+    @PostMapping(value = "/entities", consumes = "multipart/form-data")
+    public ResponseEntity<String> addEntity(
+            @RequestParam("file") MultipartFile file,
+            @Valid @RequestBody AddObjectRequest request) {
+        Long personId = null;
+        Long objectId = null;
+        if (ObjectType.PERSON.equals(request.type())) {
+            personId = personService.createPerson(request.name());
+        } else {
+            objectId = objectService.createObject(request.name());
+        }
+        try {
+            imageService.uploadImage(file, personId, objectId);
+            return ResponseEntity.ok("Entity added: " + request.name());
+        } catch (Exception e) {
+            return ResponseEntity.badRequest().body("Failed to add entity: " + e.getMessage());
+        }
     }
 }

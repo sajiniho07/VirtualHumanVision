@@ -45,8 +45,7 @@ public class ImageService {
             Person person = personRepository.findById(personId)
                     .orElseThrow(() -> new IllegalArgumentException("Person not found"));
             image.setPerson(person);
-        }
-        if (objectId != null) {
+        } else if (objectId != null) {
             VhvObject vhvObject = objectRepository.findById(objectId)
                     .orElseThrow(() -> new IllegalArgumentException("Object not found"));
             image.setVhvObject(vhvObject);
